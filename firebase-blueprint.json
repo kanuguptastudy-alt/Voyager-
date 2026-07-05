@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "Trip": {
+      "title": "Trip",
+      "description": "A saved trip planned by the user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the owning user"
+        },
+        "destination": {
+          "type": "string",
+          "description": "The destination of the trip"
+        },
+        "budget": {
+          "type": "string",
+          "description": "The budget level of the trip"
+        },
+        "days": {
+          "type": "number",
+          "description": "The duration of the trip in days"
+        },
+        "travelers": {
+          "type": "number",
+          "description": "The number of travelers"
+        },
+        "interests": {
+          "type": "string",
+          "description": "The traveler's interests or themes"
+        },
+        "style": {
+          "type": "string",
+          "description": "The style of travel (e.g., Active, Relaxed, Balanced)"
+        },
+        "itinerary": {
+          "type": "object",
+          "description": "The AI-generated itinerary data"
+        },
+        "packingList": {
+          "type": "array",
+          "description": "The AI-generated packing list"
+        },
+        "isFavorite": {
+          "type": "boolean",
+          "description": "Whether the trip is favorited by the user"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Timestamp when the trip was created"
+        }
+      },
+      "required": ["userId", "destination", "budget", "days", "travelers", "interests", "style", "itinerary", "createdAt"]
+    }
+  },
+  "firestore": {
+    "trips": {
+      "schema": "Trip",
+      "description": "Collection of user-planned trips"
+    }
+  }
+}

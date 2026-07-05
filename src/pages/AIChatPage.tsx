@@ -17,7 +17,7 @@ const AIChatPage: React.FC = () => {
     {
       id: "welcome",
       role: "assistant",
-      text: "Hello! I am your AI Travel Assistant. Ask me anything about destinations, hidden gems, budgets, transit, or packing advice. Where are we exploring next?",
+      text: "Hello! I am your Voyages AI Companion. Ask me anything about destinations, hidden gems, budgets, transit, or packing advice. Where are we exploring next?",
       timestamp: Date.now(),
     },
   ]);

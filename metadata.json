@@ -1,5 +1,5 @@
 {
-  "name": "AI Travel Assistant",
+  "name": "Voyages",
   "description": "Your ultimate companion for personalized itineraries, AI-powered chat, real-time weather integration, and collaborative budget planning.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

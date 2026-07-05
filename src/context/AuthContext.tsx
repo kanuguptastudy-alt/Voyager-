@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User, signInAnonymously } from "firebase/auth";
 import { auth } from "../firebase/config";
 
 interface AuthContextType {
   user: any | null;
   loading: boolean;
   logout: () => Promise<void>;
-  loginAsGuest: () => void;
+  loginAsGuest: () => void | Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,15 +32,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const loginAsGuest = () => {
-    const mockUser = {
-      uid: "guest-" + Math.random().toString(36).substring(2, 9),
-      email: "guest@example.com",
-      displayName: "Traveler Guest",
-      isAnonymous: true,
-    };
-    localStorage.setItem("travel_assistant_guest_user", JSON.stringify(mockUser));
-    setGuestUser(mockUser);
+  const loginAsGuest = async () => {
+    setLoading(true);
+    try {
+      await signInAnonymously(auth);
+    } catch (e) {
+      console.error("Firebase signInAnonymously failed, falling back to mock guest:", e);
+      const mockUser = {
+        uid: "guest-" + Math.random().toString(36).substring(2, 9),
+        email: "guest@example.com",
+        displayName: "Traveler Guest",
+        isAnonymous: true,
+      };
+      localStorage.setItem("travel_assistant_guest_user", JSON.stringify(mockUser));
+      setGuestUser(mockUser);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = async () => {

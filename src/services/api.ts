@@ -89,3 +89,98 @@ export async function fetchWeather(lat: number, lng: number): Promise<WeatherDat
     dates: data.daily.time,
   };
 }
+
+export async function geocodeDestination(name: string): Promise<{ lat: number; lng: number }> {
+  try {
+    const response = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`
+    );
+    if (!response.ok) {
+      throw new Error("Geocoding failed");
+    }
+    const data = await response.json();
+    if (data.results && data.results.length > 0) {
+      return {
+        lat: data.results[0].latitude,
+        lng: data.results[0].longitude,
+      };
+    }
+    throw new Error("No results found");
+  } catch (error) {
+    console.error("Error geocoding destination:", error);
+    throw error;
+  }
+}
+
+export async function geocodePlace(
+  query: string,
+  destination: string,
+  apiKey?: string
+): Promise<{ lat: number; lng: number } | null> {
+  const fullQuery = `${query}, ${destination}`;
+
+  // 1. Try Google Maps Geocoding API first if apiKey is present
+  if (apiKey) {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullQuery)}&key=${apiKey}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === "OK" && data.results && data.results.length > 0) {
+          const loc = data.results[0].geometry.location;
+          return { lat: loc.lat, lng: loc.lng };
+        } else {
+          console.warn("Google Geocoding status was not OK:", data.status);
+        }
+      }
+    } catch (e) {
+      console.warn("Google Maps Geocoding failed, falling back to Nominatim:", e);
+    }
+  }
+
+  // 2. Try Nominatim (OpenStreetMap) Geocoding API
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&limit=1`,
+      {
+        headers: {
+          "Accept-Language": "en",
+        },
+      }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("Nominatim Geocoding failed, falling back to Open-Meteo:", e);
+  }
+
+  // 3. Try Open-Meteo Geocoding API
+  try {
+    const response = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        return {
+          lat: data.results[0].latitude,
+          lng: data.results[0].longitude,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("Open-Meteo Geocoding failed:", e);
+  }
+
+  return null;
+}
+
+

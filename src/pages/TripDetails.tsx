@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { fetchTripById, updateTrip, fetchUserTrips } from "../services/db";
-import { fetchWeather } from "../services/api";
+import { fetchWeather, geocodeDestination } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { Trip, Activity, PackingCategory, WeatherData } from "../types";
 import MapComponent from "../components/MapComponent";
@@ -32,6 +32,7 @@ import {
   Save,
   Download,
   Copy,
+  Building,
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -237,6 +238,15 @@ const TripDetails: React.FC = () => {
           const firstAct = data.itinerary?.days?.[0]?.activities?.[0];
           if (firstAct && firstAct.lat && firstAct.lng) {
             fetchDestinationWeather(firstAct.lat, firstAct.lng);
+          } else if (data.destination) {
+            // Robust fallback to geocoding the destination name
+            try {
+              const coords = await geocodeDestination(data.destination);
+              fetchDestinationWeather(coords.lat, coords.lng);
+            } catch (err) {
+              console.error("Geocoding fallback failed", err);
+              setWeatherError("Weather coordinates could not be found.");
+            }
           }
         } else {
           navigate("/dashboard");
@@ -454,46 +464,133 @@ const TripDetails: React.FC = () => {
           </div>
         </div>
 
-        {/* Hero Meta Info */}
-        <div className="p-6 md:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm relative overflow-hidden">
-          {/* Subtle background abstract shapes */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+        {/* Hero Meta Info & 5-Day Weather Forecast Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2">
-              <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold tracking-wider uppercase border border-indigo-100 dark:border-indigo-900/40">
-                {trip.style} Adventure
-              </span>
-              <h1 className="text-3xl md:text-4xl font-extrabold font-display text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                {trip.destination}
-              </h1>
-              <p className="text-slate-500 dark:text-slate-400 text-sm max-w-2xl font-light">
-                {trip.itinerary?.summary}
-              </p>
-            </div>
+          {/* Hero Meta Info (Takes up 2/3 space on desktop) */}
+          <div className="lg:col-span-2 p-6 md:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            {/* Subtle background abstract shapes */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+            
+            <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-between">
+              <div className="space-y-2">
+                <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold tracking-wider uppercase border border-indigo-100 dark:border-indigo-900/40 inline-block">
+                  {trip.style} Adventure
+                </span>
+                <h1 className="text-3xl md:text-4xl font-extrabold font-display text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                  {trip.destination}
+                </h1>
+                <p className="text-slate-500 dark:text-slate-400 text-sm max-w-2xl font-light">
+                  {trip.itinerary?.summary}
+                </p>
+              </div>
 
-            {/* Config metadata labels */}
-            <div className="flex items-center gap-6 divide-x divide-slate-150 dark:divide-slate-800 shrink-0 border-t md:border-t-0 pt-4 md:pt-0">
-              <div className="space-y-1 pl-4 md:pl-0">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Duration</span>
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                  <Calendar className="w-4 h-4 text-indigo-500" /> {trip.days} Days
-                </span>
-              </div>
-              <div className="space-y-1 pl-6">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Travelers</span>
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                  <Users className="w-4 h-4 text-indigo-500" /> {trip.travelers} {trip.travelers === 1 ? "Person" : "People"}
-                </span>
-              </div>
-              <div className="space-y-1 pl-6">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Budget Level</span>
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" /> {trip.budget}
-                </span>
+              {/* Config metadata labels */}
+              <div className="flex items-center gap-6 divide-x divide-slate-150 dark:divide-slate-800 shrink-0 border-t border-slate-100 dark:border-slate-800/80 pt-4 mt-auto">
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Duration</span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                    <Calendar className="w-4 h-4 text-indigo-500" /> {trip.days} Days
+                  </span>
+                </div>
+                <div className="space-y-1 pl-6">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Travelers</span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                    <Users className="w-4 h-4 text-indigo-500" /> {trip.travelers} {trip.travelers === 1 ? "Person" : "People"}
+                  </span>
+                </div>
+                <div className="space-y-1 pl-6">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Budget Level</span>
+                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <DollarSign className="w-4 h-4" /> {trip.budget}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* 5-Day Weather Forecast Summary Card (Takes up 1/3 space on desktop) */}
+          <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
+            
+            <div className="relative z-10 space-y-4 flex-1 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <CloudSun className="w-4 h-4 text-amber-500 animate-pulse" /> 5-Day Forecast
+                </h3>
+                {weather && !weatherLoading && !weatherError && (
+                  <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40 font-semibold px-2 py-0.5 rounded-lg">
+                    Real-time
+                  </span>
+                )}
+              </div>
+
+              {weatherLoading && (
+                <div className="py-10 flex flex-col items-center justify-center space-y-2 flex-1">
+                  <div className="w-6 h-6 border-2 border-amber-100 border-t-amber-500 rounded-full animate-spin" />
+                  <p className="text-[10px] text-slate-400 font-medium animate-pulse">Loading forecast...</p>
+                </div>
+              )}
+
+              {weatherError && (
+                <div className="py-10 text-center text-xs text-slate-400 flex-1 flex items-center justify-center">
+                  {weatherError}
+                </div>
+              )}
+
+              {!weatherLoading && !weatherError && !weather && (
+                <div className="py-10 text-center text-xs text-slate-400 flex-1 flex items-center justify-center">
+                  No weather forecast available.
+                </div>
+              )}
+
+              {!weatherLoading && !weatherError && weather && (
+                <div className="space-y-3 flex-1 flex flex-col justify-center">
+                  {weather.dates?.slice(0, 5).map((dateStr, idx) => {
+                    const maxTemp = weather.temperatureMax[idx];
+                    const minTemp = weather.temperatureMin[idx];
+                    const rainProb = weather.precipitationChance[idx];
+                    const dateObj = new Date(dateStr);
+                    const isRainy = rainProb > 40;
+
+                    return (
+                      <div key={idx} className="flex items-center justify-between text-xs font-medium">
+                        {/* Day Name */}
+                        <div className="w-14">
+                          <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                            {dateObj.toLocaleDateString("en-US", { weekday: "short" })}
+                          </span>
+                        </div>
+
+                        {/* Weather icon */}
+                        <div className="flex items-center gap-1.5 w-16 justify-center">
+                          {isRainy ? (
+                            <CloudRain className="w-4 h-4 text-sky-400 shrink-0" />
+                          ) : (
+                            <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                          )}
+                          <span className="text-[10px] text-slate-400">
+                            {isRainy ? "Rainy" : "Sunny"}
+                          </span>
+                        </div>
+
+                        {/* Rain probability */}
+                        <div className="w-12 text-center text-[10px] text-slate-400 font-mono">
+                          {rainProb}% 💧
+                        </div>
+
+                        {/* High / Low temp */}
+                        <div className="w-16 text-right font-mono text-slate-800 dark:text-slate-100 font-semibold">
+                          {Math.round(maxTemp)}° <span className="text-slate-400 font-normal">/ {Math.round(minTemp)}°</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
 
         {/* Navigation Tabs bar */}
@@ -598,7 +695,7 @@ const TripDetails: React.FC = () => {
 
               {/* Map Interactive Frame (col-span-5) */}
               <div className="lg:col-span-5 h-[400px] lg:h-auto lg:sticky lg:top-24">
-                <MapComponent activities={allActivities} activeDay={activeDay} />
+                <MapComponent activities={allActivities} hotels={trip.itinerary?.hotels} activeDay={activeDay} />
               </div>
             </div>
           )}
@@ -1023,17 +1120,63 @@ const TripDetails: React.FC = () => {
 
           {/* TAB 5: PLACES TO VISIT */}
           {activeTab === "places" && (
-            <div className="space-y-6">
-              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-                <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
-                  Recommended Attractions & Sights <Award className="w-5 h-5 text-indigo-500" />
-                </h3>
-                <p className="text-xs text-slate-400 font-light mt-1">
-                  Curated hot spots in {trip.destination} matching your profile.
-                </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              
+              {/* RECOMMENDED HOTELS */}
+              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
+                    Recommended Stays & Hotels <Building className="w-5 h-5 text-amber-500" />
+                  </h3>
+                  <p className="text-xs text-slate-400 font-light mt-1">
+                    Grounded, real-world accommodations curated for your "{trip.budget}" budget in {trip.destination}.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {trip.itinerary?.hotels && trip.itinerary.hotels.length > 0 ? (
+                    trip.itinerary.hotels.map((hotel, i) => (
+                      <div key={i} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 flex flex-col gap-2 relative">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h4 className="font-bold text-slate-900 dark:text-white text-base leading-tight">{hotel.name}</h4>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-1">
+                              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" /> {hotel.address}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end shrink-0">
+                            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                              ${hotel.pricePerNight}/night
+                            </span>
+                            <span className="text-xs font-semibold text-amber-500 flex items-center gap-0.5 mt-0.5">
+                              ★ {hotel.rating}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs font-light leading-relaxed mt-1">
+                          {hotel.description}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-4">No hotel recommendations generated for this trip.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* RECOMMENDED ATTRACTIONS */}
+              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
+                    Recommended Attractions & Sights <Award className="w-5 h-5 text-indigo-500" />
+                  </h3>
+                  <p className="text-xs text-slate-400 font-light mt-1">
+                    Curated points of interest and landmarks in {trip.destination}.
+                  </p>
+                </div>
 
                 {/* Recommendations Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {allActivities?.map((act, i) => (
                     <div key={i} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 flex items-start gap-4">
                       <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
@@ -1045,13 +1188,14 @@ const TripDetails: React.FC = () => {
                             {act.category}
                           </span>
                         </div>
-                        <h4 className="font-bold text-slate-900 dark:text-white text-sm md:text-base">{act.title}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm md:text-base leading-snug">{act.title}</h4>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-light leading-relaxed">{act.description}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+
             </div>
           )}
 

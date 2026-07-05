@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateItinerary, generatePackingList } from "../services/api";
+import { generateItinerary, generatePackingList, geocodePlace } from "../services/api";
 import { saveTrip } from "../services/db";
 import { useAuth } from "../context/AuthContext";
+import { firebaseConfig } from "../firebase/config";
 import { Compass, Sparkles, Calendar, DollarSign, Users, MapPin, Smile, Landmark, PlaneTakeoff, Heart, Flame, Soup, ShoppingBag, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -37,6 +38,7 @@ const TripPlanner: React.FC = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStatusIndex, setLoadingStatusIndex] = useState(0);
+  const [customLoadingMessage, setCustomLoadingMessage] = useState<string | null>(null);
 
   // Rotate loading text for high fidelity loader
   useEffect(() => {
@@ -100,6 +102,48 @@ const TripPlanner: React.FC = () => {
         })
       ]);
 
+      // 2. Resolve precise coordinates for all generated places using Geocoding service (Google Geocoding / Nominatim)
+      setCustomLoadingMessage("Pinpointing real-world coordinates for landmarks & stays...");
+      const apiKey = firebaseConfig.apiKey;
+
+      // Geocode Hotels
+      if (itinerary.hotels && itinerary.hotels.length > 0) {
+        for (const hotel of itinerary.hotels) {
+          setCustomLoadingMessage(`Locating hotel: ${hotel.name}...`);
+          try {
+            const coords = await geocodePlace(hotel.name, destination, apiKey);
+            if (coords) {
+              hotel.lat = coords.lat;
+              hotel.lng = coords.lng;
+            }
+          } catch (e) {
+            console.error(`Failed to geocode hotel ${hotel.name}:`, e);
+          }
+        }
+      }
+
+      // Geocode Activities
+      if (itinerary.days && itinerary.days.length > 0) {
+        for (const day of itinerary.days) {
+          if (day.activities && day.activities.length > 0) {
+            for (const act of day.activities) {
+              setCustomLoadingMessage(`Verifying map marker: ${act.title}...`);
+              try {
+                const coords = await geocodePlace(act.title, destination, apiKey);
+                if (coords) {
+                  act.lat = coords.lat;
+                  act.lng = coords.lng;
+                }
+              } catch (e) {
+                console.error(`Failed to geocode activity ${act.title}:`, e);
+              }
+            }
+          }
+        }
+      }
+
+      setCustomLoadingMessage("Finalizing your customized itinerary blueprint...");
+
       // 3. Save to Firestore
       if (user) {
         const tripId = await saveTrip({
@@ -124,6 +168,7 @@ const TripPlanner: React.FC = () => {
       setError(err.message || "Something went wrong while designing your trip. Please try again.");
     } finally {
       setLoading(false);
+      setCustomLoadingMessage(null);
     }
   };
 
@@ -362,18 +407,18 @@ const TripPlanner: React.FC = () => {
               {/* Rotating Status Message */}
               <AnimatePresence mode="wait">
                 <motion.p
-                  key={loadingStatusIndex}
+                  key={customLoadingMessage ? "custom" : loadingStatusIndex}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.4 }}
-                  className="text-indigo-600 dark:text-indigo-400 text-sm font-semibold h-6"
+                  className="text-indigo-600 dark:text-indigo-400 text-sm font-semibold min-h-12 flex items-center justify-center px-4"
                 >
-                  {LOADING_STATUSES[loadingStatusIndex]}
+                  {customLoadingMessage || LOADING_STATUSES[loadingStatusIndex]}
                 </motion.p>
               </AnimatePresence>
               <p className="text-slate-400 text-xs font-light font-sans">
-                This takes about 10-15 seconds. Standard Gemini models are building a customized, data-rich plan.
+                This takes about 10-15 seconds. Our travel intelligence models are building a customized, data-rich plan.
               </p>
             </div>
 

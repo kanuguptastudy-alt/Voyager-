@@ -23,6 +23,16 @@ export interface BudgetBreakdown {
   total: number;
 }
 
+export interface Hotel {
+  name: string;
+  description: string;
+  rating: number;
+  pricePerNight: number;
+  lat: number;
+  lng: number;
+  address: string;
+}
+
 export interface ItineraryData {
   destination: string;
   budgetType: string;
@@ -31,6 +41,7 @@ export interface ItineraryData {
   summary: string;
   budgetBreakdown: BudgetBreakdown;
   days: DayItinerary[];
+  hotels: Hotel[];
   tips: string[];
 }
 

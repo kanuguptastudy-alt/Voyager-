@@ -89,7 +89,7 @@ const Login: React.FC = () => {
             <Compass className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold font-display tracking-tight text-white flex items-center justify-center gap-2">
-            AI Travel Assistant <Sparkles className="w-5 h-5 text-indigo-400" />
+            Voyages <Sparkles className="w-5 h-5 text-indigo-400" />
           </h1>
           <p className="text-slate-400 text-sm mt-2 font-light">
             Plan, customize, and budget your dream trip with AI
@@ -287,7 +287,7 @@ const Login: React.FC = () => {
         <div className="mt-8 text-center text-xs text-slate-500">
           {mode === "login" && (
             <p>
-              New to AI Travel Assistant?{" "}
+              New to Voyages?{" "}
               <button
                 onClick={() => setMode("register")}
                 className="text-indigo-400 hover:text-indigo-300 font-semibold ml-1 focus:outline-none transition-colors"

@@ -1,9 +1,100 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Global safety net: default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Trips collection
     match /trips/{tripId} {
-      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid) || (request.resource.data.userId is string && request.resource.data.userId.matches('^guest-.*'));
-      allow read, update, delete: if (request.auth != null && resource.data.userId == request.auth.uid) || (resource.data.userId is string && resource.data.userId.matches('^guest-.*'));
+      // Helper function to validate document ID
+      function isValidId(id) {
+        return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      }
+
+      // Check if user is signed in
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // Validation helper for Trip data (Anti-Update-Gap)
+      function isValidTrip(data) {
+        return data.userId is string 
+          && data.userId.size() <= 128
+          && data.destination is string
+          && data.destination.size() <= 128
+          && data.budget is string
+          && data.budget.size() <= 64
+          && data.days is int
+          && data.days >= 1
+          && data.days <= 100
+          && data.travelers is int
+          && data.travelers >= 1
+          && data.travelers <= 1000
+          && data.style is string
+          && data.style.size() <= 128
+          && data.createdAt is int;
+      }
+
+      // 1. Create rules: User must be signed in, ID must be valid, owner must match auth UID, and data must be valid.
+      // Includes fallback for legacy unauthenticated guest IDs.
+      allow create: if (
+        isSignedIn() 
+        && isValidId(tripId)
+        && request.resource.data.userId == request.auth.uid
+        && isValidTrip(request.resource.data)
+      ) || (
+        isValidId(tripId)
+        && request.resource.data.userId is string
+        && request.resource.data.userId.matches('^guest-.*')
+        && isValidTrip(request.resource.data)
+      );
+
+      // 2. Read rules: Owner can list/get their trips.
+      // List rules explicitly evaluate resource.data to prevent unauthorized query scraping.
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      // Get rules allow both standard signed-in owners and legacy/fallback unauthenticated guest IDs.
+      allow get: if (
+        isSignedIn() && resource.data.userId == request.auth.uid
+      ) || (
+        resource.data.userId is string && resource.data.userId.matches('^guest-.*')
+      );
+
+      // 3. Delete rules: Only the authenticated owner or matching guest can delete.
+      allow delete: if (
+        isSignedIn() && resource.data.userId == request.auth.uid
+      ) || (
+        resource.data.userId is string && resource.data.userId.matches('^guest-.*')
+      );
+
+      // 4. Update rules: Validates trip shape and restricts changes to allowed action-based fields.
+      allow update: if (
+        isSignedIn() 
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && isValidTrip(request.resource.data)
+        && (
+          // Action: toggle favorite
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isFavorite'])
+          ||
+          // Action: update packingList
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['packingList'])
+        )
+      ) || (
+        resource.data.userId is string 
+        && resource.data.userId.matches('^guest-.*')
+        && request.resource.data.userId == resource.data.userId
+        && isValidTrip(request.resource.data)
+        && (
+          // Action: toggle favorite
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isFavorite'])
+          ||
+          // Action: update packingList
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['packingList'])
+        )
+      );
     }
   }
 }

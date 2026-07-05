@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import L from "leaflet";
-import { Activity } from "../types";
+import { Activity, Hotel } from "../types";
 
 // Setup Leaflet icon markers correctly
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -12,10 +12,11 @@ L.Icon.Default.mergeOptions({
 
 interface MapComponentProps {
   activities: Activity[];
+  hotels?: Hotel[];
   activeDay?: number;
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ activities, activeDay }) => {
+const MapComponent: React.FC<MapComponentProps> = ({ activities, hotels, activeDay }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -39,12 +40,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, activeDay }) =>
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    // Filter activities if needed or show all
+    // Filter activities & hotels if needed or show all
     const validActivities = activities.filter((act) => act.lat && act.lng);
+    const validHotels = (hotels || []).filter((h) => h.lat && h.lng);
 
-    if (validActivities.length > 0 && mapRef.current) {
+    if ((validActivities.length > 0 || validHotels.length > 0) && mapRef.current) {
       const bounds: L.LatLngTuple[] = [];
 
+      // Add activities markers
       validActivities.forEach((act, index) => {
         if (!mapRef.current) return;
 
@@ -79,6 +82,41 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, activeDay }) =>
         bounds.push([act.lat, act.lng]);
       });
 
+      // Add hotel markers
+      validHotels.forEach((hotel) => {
+        if (!mapRef.current) return;
+
+        const customHotelIcon = L.divIcon({
+          className: "custom-leaflet-hotel-marker",
+          html: `
+            <div class="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500 text-white font-semibold text-xs border-2 border-white shadow-lg transform hover:scale-110 transition-transform">
+              🏨
+            </div>
+          `,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+          popupAnchor: [0, -16],
+        });
+
+        const marker = L.marker([hotel.lat, hotel.lng], { icon: customHotelIcon })
+          .addTo(mapRef.current)
+          .bindPopup(`
+            <div class="p-1 min-w-[150px]">
+              <span class="inline-block px-1.5 py-0.5 mb-1 text-[10px] font-semibold tracking-wide rounded bg-amber-100 text-amber-800 uppercase">Hotel / Lodging</span>
+              <h3 class="font-bold text-sm text-slate-900">${hotel.name}</h3>
+              <p class="text-xs text-slate-600 mt-1">${hotel.description}</p>
+              <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-100">
+                <span class="text-xs font-medium text-amber-600">★ ${hotel.rating}</span>
+                <span class="text-xs font-semibold text-emerald-600">$${hotel.pricePerNight}/night</span>
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1 italic">${hotel.address}</p>
+            </div>
+          `);
+
+        markersRef.current.push(marker);
+        bounds.push([hotel.lat, hotel.lng]);
+      });
+
       // Fit map bounds to show all markers
       mapRef.current.fitBounds(bounds, { padding: [50, 50] });
     }
@@ -92,7 +130,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, activeDay }) =>
     return () => {
       resizeObserver.disconnect();
     };
-  }, [activities]);
+  }, [activities, hotels]);
 
   // Handle active activity focusing (if activeDay changes)
   useEffect(() => {

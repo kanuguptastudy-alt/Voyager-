@@ -75,7 +75,7 @@ const AppLayout: React.FC = () => {
               <CompassIcon className="w-5 h-5 animate-spin-slow" />
             </div>
             <span className="text-lg font-bold font-display tracking-tight text-slate-950 dark:text-white flex items-center gap-1.5">
-              AI Travel Assistant <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+              Voyages <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
             </span>
           </Link>
 
